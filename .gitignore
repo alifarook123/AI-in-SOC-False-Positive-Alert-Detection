@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.ipynb_checkpoints/
+
+# Environments
+.venv/
+env/
+venv/
+
+# VS Code
+.vscode/
+
+# Data & models (optional — keep if they are small)
+data/raw/
+data/processed/
+models/
