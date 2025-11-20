@@ -1,55 +1,48 @@
-import streamlit as st
-import pandas as pd
-import numpy as np
-import pydeck as pdk
+# app/main.py
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pathlib import Path
+import csv
 
-st.set_page_config(page_title="TXCr AI+SOC Project", page_icon="", layout="wide")
-st.title("TXCr AI+SOC Project DEMO")
+app = FastAPI(title="TXCr AI+SOC API", version="0.1.0")
 
-# Sidebar controls
-st.sidebar.header("Controls")
-n = st.sidebar.slider("Number of points", 10, 1000, 200, step=10)
-show_map = st.sidebar.checkbox("Show map (pydeck)", value=True)
+# If you later add a web UI (React, etc.), allow it here:
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost", "http://127.0.0.1"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# Random data & chart
-rng = np.random.default_rng(42)
-df = pd.DataFrame({
-    "x": np.arange(n),
-    "y": rng.normal(loc=0, scale=1, size=n).cumsum()
-})
-st.subheader("Line chart")
-st.line_chart(df, x="x", y="y")
+DATA_DIR = Path("data/raw")
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-# File upload
-st.subheader("Upload a CSV")
-csv = st.file_uploader("Choose a CSV file", type=["csv"])
-if csv:
-    user_df = pd.read_csv(csv)
-    st.write("Preview:", user_df.head())
-    st.bar_chart(user_df.select_dtypes(include=[np.number]).iloc[:, :1])
+@app.get("/")
+def health():
+    return {"ok": True, "service": "txcr-ai-soc", "version": "0.1.0"}
 
-# Pydeck map (uses your pydeck config)
-if show_map:
-    st.subheader("Pydeck Map")
-    # Austin-ish random points
-    base_lat, base_lon = 30.2672, -97.7431
-    map_df = pd.DataFrame({
-        "lat": base_lat + (rng.random(n) - 0.5) * 0.2,
-        "lon": base_lon + (rng.random(n) - 0.5) * 0.2,
-        "value": rng.integers(1, 10, size=n)
-    })
+@app.post("/upload_csv")
+async def upload_csv(file: UploadFile = File(...)):
+    if not file.filename.lower().endswith(".csv"):
+        raise HTTPException(status_code=400, detail="Please upload a .csv file")
 
-    layer = pdk.Layer(
-        "HexagonLayer",
-        data=map_df,
-        get_position='[lon, lat]',
-        radius=1000,
-        elevation_scale=50,
-        elevation_range=[0, 1000],
-        pickable=True,
-        extruded=True,
-    )
-    view_state = pdk.ViewState(latitude=base_lat, longitude=base_lon, zoom=8, pitch=40)
-    st.pydeck_chart(pdk.Deck(layers=[layer], initial_view_state=view_state, tooltip={"text":"Value: {value}"}))
+    target_path = DATA_DIR / file.filename
+    content = await file.read()
+    target_path.write_bytes(content)
 
-st.caption("Tip: edit this file and the app hot-reloads automatically.")
+    # Try to read header only (no numpy/pandas)
+    try:
+        header = []
+        with target_path.open("r", newline="", encoding="utf-8", errors="ignore") as f:
+            reader = csv.reader(f)
+            header = next(reader, [])
+    except Exception:
+        header = []
+
+    return {"saved_to": str(target_path), "columns": header, "bytes": len(content)}
+
+@app.get("/files")
+def list_files():
+    files = [str(p.name) for p in DATA_DIR.glob("*.csv")]
+    return {"count": len(files), "files": files}
