@@ -3,8 +3,8 @@ import pandas as pd
 import numpy as np
 import pydeck as pdk
 
-st.set_page_config(page_title="Streamlit Demo", page_icon="✨", layout="wide")
-st.title("✨ Streamlit Demo")
+st.set_page_config(page_title="TXCr AI+SOC Project", page_icon="", layout="wide")
+st.title("TXCr AI+SOC Project DEMO")
 
 # Sidebar controls
 st.sidebar.header("Controls")
@@ -53,4 +53,3 @@ if show_map:
     st.pydeck_chart(pdk.Deck(layers=[layer], initial_view_state=view_state, tooltip={"text":"Value: {value}"}))
 
 st.caption("Tip: edit this file and the app hot-reloads automatically.")
-
